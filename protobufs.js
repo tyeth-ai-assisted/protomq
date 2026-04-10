@@ -1,7 +1,10 @@
 import protobuf from "protobufjs"
-import protobufJSON from "./protobufs/bundle.json" with { type: "json" }
+import { readFileSync } from "fs"
 
 
+// Load proto bundle via readFileSync to avoid JSON import assertion issues
+// across different Node.js versions (assert vs with syntax)
+const protobufJSON = JSON.parse(readFileSync(new URL("./protobufs/bundle.json", import.meta.url)))
 const protobufRoot = protobuf.Root.fromJSON(protobufJSON)
 
 export default protobufRoot
