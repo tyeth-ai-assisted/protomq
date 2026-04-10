@@ -1,0 +1,78 @@
+{
+  "name": "Metro S2 128x32 OLED V1 Demo",
+  "description": "Tests SSD1306 128x32 I2C OLED display on Metro ESP32-S2 using V1 protocol. V1 devices send flat-field checkinRequest (id 30), not nested checkin.request envelope.",
+  "protoVersion": "v1",
+  "steps": [
+    {
+      "name": "checkin-response",
+      "description": "Respond to V1 device checkin (flat field checkinRequest at id 30)",
+      "trigger": "checkinRequest",
+      "response": {
+        "checkinResponse": {
+          "response": "RESPONSE_OK",
+          "totalGpioPins": 20,
+          "totalAnalogPins": 4,
+          "referenceVoltage": 2.5
+        }
+      }
+    },
+    {
+      "name": "add-display",
+      "description": "Configure the 128x32 SSD1306 OLED display via I2C at 0x3C",
+      "after": "checkin-response",
+      "delay": 2000,
+      "send": {
+        "display": {
+          "add": {
+            "type": "DISPLAY_CLASS_OLED",
+            "driver": "SSD1306",
+            "panel": "oled128x32default",
+            "name": "oled128x32default",
+            "i2c": {
+              "deviceAddress": 60,
+              "busSda": "D33",
+              "busScl": "D34"
+            },
+            "configDisplay": {
+              "width": 128,
+              "height": 32,
+              "textSize": 1
+            },
+            "write": {
+              "name": "oled128x32default",
+              "message": "Hello ProtoMQ V1!"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "write-hello",
+      "description": "Write a test message to the OLED",
+      "after": "add-display",
+      "delay": 3000,
+      "send": {
+        "display": {
+          "write": {
+            "name": "oled128x32default",
+            "message": "V1 Proto Test\nMetro S2 OLED"
+          }
+        }
+      }
+    },
+    {
+      "name": "write-update",
+      "description": "Write final status message",
+      "after": "write-hello",
+      "delay": 5000,
+      "send": {
+        "display": {
+          "write": {
+            "name": "oled128x32default",
+            "message": "OLED 0x3C ready\nV1 Test OK"
+          }
+        }
+      }
+    }
+  ]
+}
