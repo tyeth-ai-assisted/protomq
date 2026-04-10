@@ -102,7 +102,8 @@ export class ScriptExecutor {
     this._pendingWaitSteps = []  // Steps waiting for a D2B message match
     this._disabledSteps = new Set(disabledSteps)
     this.autoReset = autoReset
-    this._b2dTopic = null  // Derived from first incoming D2B topic
+    this._b2dTopic = null  // Derived from first incoming D2B topic (V2: full topic, V1: checkin response topic)
+    this._v1TopicBase = null  // V1 only: base path for constructing per-signal topics (e.g., "user/wprsnpr/id/signals/broker")
   }
 
   get name() {
@@ -112,8 +113,30 @@ export class ScriptExecutor {
   /**
    * Process an incoming D2B message. Returns true if a trigger matched.
    */
+  /**
+   * Derive the correct B2D topic for a step.
+   * V2: always the same topic (d2b→b2d swap).
+   * V1: if step specifies a "topic" field (e.g., "display"), construct
+   *     the per-signal broker topic: {user}/wprsnpr/{id}/signals/broker/{topic}
+   *     Otherwise use the default response topic (e.g., broker/checkin).
+   */
+  _getPublishTopic(step) {
+    if (step && step.topic && this._v1TopicBase) {
+      return `${this._v1TopicBase}/${step.topic}`
+    }
+    return this._b2dTopic
+  }
+
   handleMessage(decodedMessage, packet) {
     this._b2dTopic = deriveB2dTopic(packet.topic)
+
+    // For V1 topics, extract the base path for per-signal topic construction
+    if (packet.topic.includes('/signals/device/')) {
+      // e.g., "user/wprsnpr/id/signals/device/checkin" → "user/wprsnpr/id/signals/broker"
+      const brokerTopic = packet.topic.replace('/signals/device/', '/signals/broker/')
+      this._v1TopicBase = brokerTopic.substring(0, brokerTopic.lastIndexOf('/'))
+    }
+
     let matched = false
 
     // Check trigger steps
@@ -127,8 +150,11 @@ export class ScriptExecutor {
           if (!this.autoReset) continue
           console.log(`[Script: ${this.script.name}] Auto-reset: trigger "${step.name}" fired again`)
           this.reset()
-          // TODO: deriveB2dTopic only handles V2 topics — will need V1 topic derivation when V1 scripts are supported
           this._b2dTopic = deriveB2dTopic(packet.topic)
+          if (packet.topic.includes('/signals/device/')) {
+            const brokerTopic = packet.topic.replace('/signals/device/', '/signals/broker/')
+            this._v1TopicBase = brokerTopic.substring(0, brokerTopic.lastIndexOf('/'))
+          }
         }
         console.log(`[Script: ${this.script.name}] Trigger matched: "${step.name}" (${step.trigger})`)
         this._executeStep(step, packet)
@@ -162,17 +188,19 @@ export class ScriptExecutor {
    * Execute a step: send response, mark complete, schedule follow-ups.
    */
   _executeStep(step, packet) {
-    // Send response/payload to the device's B2D topic
+    // Send response/payload to the appropriate topic
     if (step.response) {
-      console.log(`[Script: ${this.script.name}] Sending response for "${step.name}" on ${this._b2dTopic}`)
+      const topic = this._getPublishTopic(step)
+      console.log(`[Script: ${this.script.name}] Sending response for "${step.name}" on ${topic}`)
       const encoded = BrokerToDevice.encode(BrokerToDevice.fromObject(step.response)).finish()
-      this.broker.publish({ topic: this._b2dTopic, payload: encoded })
+      this.broker.publish({ topic, payload: encoded })
     }
 
     if (step.send) {
-      console.log(`[Script: ${this.script.name}] Sending payload for "${step.name}" on ${this._b2dTopic}`)
+      const topic = this._getPublishTopic(step)
+      console.log(`[Script: ${this.script.name}] Sending payload for "${step.name}" on ${topic}`)
       const encoded = BrokerToDevice.encode(BrokerToDevice.fromObject(step.send)).finish()
-      this.broker.publish({ topic: this._b2dTopic, payload: encoded })
+      this.broker.publish({ topic, payload: encoded })
     }
 
     // Mark step complete
@@ -218,6 +246,7 @@ export class ScriptExecutor {
     this._pendingWaitSteps = []
     this.completedSteps.clear()
     this._b2dTopic = null
+    this._v1TopicBase = null
     if (disabledSteps !== undefined) this._disabledSteps = new Set(disabledSteps)
     if (autoReset !== undefined) this.autoReset = autoReset
     console.log(`[Script: ${this.script.name}] Reset`)

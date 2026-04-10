@@ -1,6 +1,6 @@
 {
-  "name": "Metro S2 128x32 OLED V1 Demo",
-  "description": "Tests SSD1306 128x32 I2C OLED display on Metro ESP32-S2 using V1 protocol. V1 devices send flat-field checkinRequest (id 30), not nested checkin.request envelope.",
+  "name": "Metro S2 16x2 Character LCD V1 Demo",
+  "description": "Tests MCP23008-based 16x2 I2C character LCD on Metro ESP32-S2 using V1 protocol. V1 devices send flat-field checkinRequest (id 30), not nested checkin.request envelope.",
   "protoVersion": "v1",
   "steps": [
     {
@@ -18,30 +18,29 @@
     },
     {
       "name": "add-display",
-      "description": "Configure the 128x32 SSD1306 OLED display via I2C at 0x3C",
+      "description": "Configure the 16x2 character LCD via I2C at 0x20 (MCP23008 backpack)",
       "after": "checkin-response",
       "delay": 2000,
       "topic": "display",
       "send": {
         "display": {
           "add": {
-            "type": "DISPLAY_CLASS_OLED",
-            "driver": "SSD1306",
-            "panel": "oled128x32default",
-            "name": "oled128x32default",
+            "type": "DISPLAY_CLASS_CHAR_LCD",
+            "driver": "charlcd",
+            "panel": "charlcd16x2default",
+            "name": "charlcd16x2default",
             "i2c": {
-              "deviceAddress": 60,
+              "deviceAddress": 32,
               "busSda": "D33",
               "busScl": "D34"
             },
-            "configDisplay": {
-              "width": 128,
-              "height": 32,
-              "textSize": 1
+            "configCharLcd": {
+              "columns": 16,
+              "rows": 2
             },
             "write": {
-              "name": "oled128x32default",
-              "message": "Hello ProtoMQ V1!"
+              "name": "charlcd16x2default",
+              "message": "Hello ProtoMQ!"
             }
           }
         }
@@ -49,30 +48,30 @@
     },
     {
       "name": "write-hello",
-      "description": "Write a test message to the OLED",
+      "description": "Write a test message to the LCD",
       "after": "add-display",
       "delay": 3000,
       "topic": "display",
       "send": {
         "display": {
           "write": {
-            "name": "oled128x32default",
-            "message": "V1 Proto Test\nMetro S2 OLED"
+            "name": "charlcd16x2default",
+            "message": "Hello ProtoMQ!\nMetro S2 LCD"
           }
         }
       }
     },
     {
       "name": "write-update",
-      "description": "Write final status message",
+      "description": "Write an updated status message",
       "after": "write-hello",
       "delay": 5000,
       "topic": "display",
       "send": {
         "display": {
           "write": {
-            "name": "oled128x32default",
-            "message": "OLED 0x3C ready\nV1 Test OK"
+            "name": "charlcd16x2default",
+            "message": "LCD 0x20 ready\n16x2 V1 Test OK"
           }
         }
       }
