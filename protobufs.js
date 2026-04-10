@@ -6,9 +6,21 @@ const protobufRoot = protobuf.Root.fromJSON(protobufJSON)
 
 export default protobufRoot
 
+// The bundle namespace varies depending on how it was generated:
+// - npm run import-protos: "signal.BrokerToDevice"
+// - npx pbjs from wippersnapper protos: "wippersnapper.signal.BrokerToDevice"
+// Try both paths to be resilient.
+const tryLookup = (name) => {
+  try { return protobufRoot.lookupType(name) } catch (e) {
+    try { return protobufRoot.lookupType(`wippersnapper.${name}`) } catch (e2) {
+      throw new Error(`Proto type not found as "${name}" or "wippersnapper.${name}"`)
+    }
+  }
+}
+
 export const
-  BrokerToDevice = protobufRoot.lookupType("signal.BrokerToDevice"),
-  DeviceToBroker = protobufRoot.lookupType("signal.DeviceToBroker")
+  BrokerToDevice = tryLookup("signal.BrokerToDevice"),
+  DeviceToBroker = tryLookup("signal.DeviceToBroker")
 
 // V1 devices use the same DeviceToBroker/BrokerToDevice proto types (which contain
 // both V1 flat fields like checkinRequest at id 30 AND V2 envelope fields like checkin
