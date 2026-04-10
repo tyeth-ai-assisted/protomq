@@ -1,9 +1,7 @@
 import protobuf from "protobufjs"
 import protobufJSON from "./protobufs/bundle.json" with { type: "json" }
-import protobufV1JSON from "./protobufs-v1/bundle.json" with { type: "json" }
 
 
-// V2 proto root (nested signal envelopes)
 const protobufRoot = protobuf.Root.fromJSON(protobufJSON)
 
 export default protobufRoot
@@ -12,9 +10,9 @@ export const
   BrokerToDevice = protobufRoot.lookupType("signal.BrokerToDevice"),
   DeviceToBroker = protobufRoot.lookupType("signal.DeviceToBroker")
 
-// V1 proto root (flat message keys, older firmware)
-const protobufV1Root = protobuf.Root.fromJSON(protobufV1JSON)
-
-export const
-  V1BrokerToDevice = protobufV1Root.lookupType("signal.BrokerToDevice"),
-  V1DeviceToBroker = protobufV1Root.lookupType("signal.DeviceToBroker")
+// V1 devices use the same DeviceToBroker/BrokerToDevice proto types (which contain
+// both V1 flat fields like checkinRequest at id 30 AND V2 envelope fields like checkin
+// at id 1). The difference is purely topic routing, not proto schema. So we reuse the
+// same types for both V1 and V2 topic handlers.
+export const V1BrokerToDevice = BrokerToDevice
+export const V1DeviceToBroker = DeviceToBroker
