@@ -10,7 +10,7 @@ import { addDefaultPBResponses, addEchoService } from './protobuf_autoresponders
 
 export const createBroker = async () => {
   const
-    broker = Aedes(),
+    broker = Aedes({ heartbeatInterval: 60000 }),
     server = net.createServer(broker.handle),
     mqttPort = 1884,
     httpServer = http.createServer(),

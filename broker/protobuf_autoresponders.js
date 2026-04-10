@@ -4,7 +4,7 @@
   Uses playback scripts from scripts/ directory for demo sequences.
 */
 import { find, keys, camelCase } from 'lodash-es'
-import { BrokerToDevice, DeviceToBroker } from "../protobufs.js"
+import { BrokerToDevice, DeviceToBroker, V1BrokerToDevice, V1DeviceToBroker } from "../protobufs.js"
 import { installScriptRunner } from './script_runner.js'
 
 
@@ -165,14 +165,56 @@ export const
     broker.subscribe(
       '+/wprsnpr/+/signals/device/+',
       (packet, callback) => {
-        // V1 messages use per-component wrapper protos (DisplayRequest, etc.)
-        // Full V1 decode requires V1 proto bundle (not yet imported)
-        console.log(`[V1 topic] Received on: ${packet.topic} (${packet.payload.length} bytes)`)
-        console.log(`[V1 topic] Note: V1 proto decode not yet implemented`)
+        const rawHex = Buffer.from(packet.payload).toString('hex')
+        const responseTopic = packet.topic.replace('/signals/device/', '/signals/broker/')
+        let d2bRequest
+        try {
+          d2bRequest = V1DeviceToBroker.decode(packet.payload)
+        } catch (err) {
+          console.log(`[V1] Failed to decode payload on ${packet.topic} (${packet.payload.length} bytes, hex: ${rawHex}):`, err.message)
+          callback()
+          return
+        }
+        const decodedJson = JSON.stringify(V1DeviceToBroker.toObject(d2bRequest, { enums: String, defaults: true }), null, 2)
+        console.log(`[V1 topic] Received on: ${packet.topic}\n  decoded: ${decodedJson}`)
+
+        // Try active script first (reuse same handler chain as V2)
+        if (_scriptState.activeExecutor) {
+          const handled = _scriptState.activeExecutor.handleMessage(d2bRequest, packet)
+          if (handled) {
+            callback()
+            return
+          }
+        }
+
+        // Fallback: V2 nested checkin matching
+        if (_fallbackCheckinEnabled) {
+          const v2Response = handleV2CheckinFallback(d2bRequest)
+          if (v2Response) {
+            console.log(`[V1 Fallback V2-envelope] Auto-Responding to checkin on ${responseTopic}`)
+            const b2dResponse = V1BrokerToDevice.encode(V1BrokerToDevice.fromObject(v2Response)).finish()
+            broker.publish({ topic: responseTopic, payload: b2dResponse })
+            callback()
+            return
+          }
+        }
+
+        // Fallback: V1 flat field matching
+        const v1ResponsePayload = find(v1RequestToResponseMap, (response, requestKey) =>
+          d2bRequest[requestKey]
+        )
+
+        if (v1ResponsePayload) {
+          console.log(`[V1 Fallback flat] Auto-Responding on ${responseTopic}`)
+          const b2dResponse = V1BrokerToDevice.encode(V1BrokerToDevice.fromObject(v1ResponsePayload)).finish()
+          broker.publish({ topic: responseTopic, payload: b2dResponse })
+        } else {
+          console.log(`[V1] Not Auto-Responding to: ${packet.topic}\n  decoded: ${decodedJson}`)
+        }
 
         callback()
       },
-      () => console.log('V1 topic listener installed (decode pending V1 proto import)')
+      () => console.log('V1 protobuf autoresponders installed')
     )
   },
 

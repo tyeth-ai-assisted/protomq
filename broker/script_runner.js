@@ -79,10 +79,14 @@ const matchesTrigger = (decodedMessage, trigger) => {
 
 /**
  * Derive the B2D topic from an incoming D2B topic.
- * V2 devices subscribe to a single B2D topic: {prefix}/ws-b2d/{device-uid}
- * e.g., "test_user/ws-d2b/feather-esp32s3-xyz" -> "test_user/ws-b2d/feather-esp32s3-xyz"
+ * V2: {prefix}/ws-d2b/{device-uid} -> {prefix}/ws-b2d/{device-uid}
+ * V1: {user}/wprsnpr/{id}/signals/device/{type} -> {user}/wprsnpr/{id}/signals/broker/{type}
  */
-const deriveB2dTopic = (d2bTopic) => d2bTopic.replace('/ws-d2b/', '/ws-b2d/')
+const deriveB2dTopic = (d2bTopic) => {
+  if (d2bTopic.includes('/ws-d2b/')) return d2bTopic.replace('/ws-d2b/', '/ws-b2d/')
+  if (d2bTopic.includes('/signals/device/')) return d2bTopic.replace('/signals/device/', '/signals/broker/')
+  return d2bTopic  // fallback: echo back unchanged
+}
 
 
 /**

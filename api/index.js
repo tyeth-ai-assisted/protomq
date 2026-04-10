@@ -12,6 +12,8 @@ export const createWebApp = (mqttBroker) => {
   app.use(express.static('dist'))
   // mount the protobuf import directory
   app.use('/protobufs', express.static('protobufs'))
+  // mount the runs output directory (runner API artifacts)
+  app.use('/runs', express.static('runs'))
 
   // enable json and expose the API endpoints
   app.use(express.json())
