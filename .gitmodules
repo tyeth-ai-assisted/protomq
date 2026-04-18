@@ -1,0 +1,3 @@
+[submodule "hil-detection"]
+	path = hil-detection
+	url = https://github.com/tyeth-ai-assisted/hil-detection.git
